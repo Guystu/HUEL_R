@@ -2,7 +2,9 @@
 title: "HUEL Satiety"
 author: "Guy Taylor"
 date: today
-format: html
+format:
+      html: 
+           embed-resources: true
 toc: true
 toc-location: left
 toc-title: ""
