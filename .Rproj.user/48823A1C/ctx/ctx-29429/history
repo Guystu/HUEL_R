@@ -1,0 +1,512 @@
+theme_minimal()
+# Create normal Q-Q plot
+qq_plot <- qqnorm(resid(anova_results), main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(resid(anova_results))
+# Combine plots into a list
+plots <- list(Homogeneity_of_Variances = plot_homogeneity, Normal_QQ_Plot = qq_plot)
+# Create a list to store the results
+assumptions <- list(levene_test = levene_test, shapiro_test = shapiro_test, plots = plots)
+return(assumptions)
+}
+check_anova_assumptions(anova_results_S1)
+source(file = "../R/HUEL_satiety_functions.R")
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+check_anova_assumptions(anova_results_S1)
+check_anova_assumptions <- function(anova_results, residuals) {
+# Check homogeneity of variances
+levene_test <- leveneTest(residuals)
+# Check normality of residuals
+shapiro_test <- shapiro.test(as.vector(residuals))
+# Create homogeneity of variances plot
+plot_homogeneity <- ggplot(data.frame(Residuals = residuals), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+# Create normal Q-Q plot
+qq_plot <- qqnorm(residuals, main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(residuals)
+# Combine plots into a list
+plots <- list(Homogeneity_of_Variances = plot_homogeneity, Normal_QQ_Plot = qq_plot)
+# Create a list to store the results
+assumptions <- list(levene_test = levene_test, shapiro_test = shapiro_test, plots = plots)
+return(assumptions)
+}
+source(file = "../R/HUEL_satiety_functions.R")
+check_anova_assumptions(anova_results_S1)
+check_anova_assumptions(anova_results_S1, resid(anova_results_S1))
+levene_test <- leveneTest(resid(anova_results_S1))
+shapiro_test <- shapiro.test(as.vector(resid(anova_results_S1)))
+# Check homogeneity of variances
+levene_test <- leveneTest(resid(anova_results_S1))
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(anova_results_S1)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+qq_plot <- qqnorm(resid(anova_results_S1), main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(resid(anova_results_S1))
+summary(anova_results_S1)
+residuals_S1 <- resid(anova_results_S1)
+residuals_S1 <- resid(anova_results_S1)
+residuals_S1 <- resid(anova_results_S1)
+View(anova_results_S1)
+# Function to perform two-way ANOVA with additional diagnostic plots and tests
+run_two_way_anova <- function(data, question) {
+# Subset data to include only the specified question
+subset_data <- filter(data, Question == question)
+# Perform two-way ANOVA
+anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = subset_data)
+# Extract residuals from the ANOVA results
+residuals <- resid(anova_results)
+# Store residuals in the ANOVA results data frame
+anova_results$residuals <- residuals
+# Store ANOVA results in a variable with a dynamic name
+assign(paste0("anova_results_", question), anova_results, envir = .GlobalEnv)
+# Print ANOVA summary
+print(summary(anova_results))
+source(file = "../R/HUEL_satiety_functions.R")
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+View(anova_results_S1)
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+View(anova_results_S1)
+# Function to perform two-way ANOVA with additional diagnostic plots and tests
+run_two_way_anova <- function(data, question) {
+# Subset data to include only the specified question
+subset_data <- filter(data, Question == question)
+# Perform two-way ANOVA
+anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = subset_data)
+# Extract residuals from the ANOVA results
+residuals <- resid(anova_results)
+# Store residuals in the ANOVA results data frame
+anova_results$residuals <- residuals
+# Store ANOVA results in a variable with a dynamic name
+assign(paste0("anova_results_", question), anova_results, envir = .GlobalEnv)
+# Print ANOVA summary
+print(summary(anova_results))
+}
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+source(file = "../R/HUEL_satiety_functions.R")
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+residuals <- resid(anova_results)
+residuals <- resid(anova_results_S1)
+anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = subset_data)
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+# Function to perform two-way ANOVA with additional diagnostic plots and tests
+run_two_way_anova <- function(data, question) {
+# Subset data to include only the specified question
+subset_data <- filter(data, Question == question)
+# Perform two-way ANOVA
+anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = subset_data)
+# Store ANOVA results in a variable with a dynamic name
+assign(paste0("anova_results_", question), anova_results, envir = .GlobalEnv)
+# Extract residuals from the ANOVA results
+residuals <- resid(anova_results)
+# Store residuals in the ANOVA results data frame
+anova_results$residuals <- residuals
+# Print ANOVA summary
+print(summary(anova_results))
+}
+source(file = "../R/HUEL_satiety_functions.R")
+# Check homogeneity of variances
+levene_test <- leveneTest(resid(anova_results_S1))
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+View(anova_results_S1)
+run_two_way_anova <- function(data, question) {
+# Subset data to include only the specified question
+subset_data <- filter(data, Question == question)
+# Perform two-way ANOVA
+anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = subset_data)
+# Store ANOVA results in a variable with a dynamic name
+assign(paste0("anova_results_", question), anova_results, envir = .GlobalEnv)
+# Print ANOVA summary
+print(summary(anova_results))
+}
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+View(anova_results_S1)
+shapiro.test(resid(anova_results_S1))
+shapiro_test <- shapiro.test(as.numeric(residuals))
+# Check if there are any missing values in the residuals
+if (any(is.na(residuals))) {
+print("There are missing values in the residuals.")
+} else {
+print("There are no missing values in the residuals.")
+}
+# Check if the residuals are numeric
+if (is.numeric(residuals)) {
+print("The residuals are numeric.")
+} else {
+print("The residuals are not numeric.")
+}
+# Function to perform two-way ANOVA with additional diagnostic plots and tests
+run_two_way_anova <- function(data, question) {
+# Subset data to include only the specified question
+subset_data <- filter(data, Question == question)
+# Perform two-way ANOVA
+anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = subset_data)
+# Store ANOVA results in a variable with a dynamic name
+assign(paste0("anova_results_", question), anova_results, envir = .GlobalEnv)
+# Extract residuals
+residuals_df <- data.frame(residuals = residuals(anova_results))
+# Print ANOVA summary
+print(summary(anova_results))
+# Return ANOVA results and residuals
+list(anova_results = anova_results, residuals = residuals_df)
+}
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+# Function to check ANOVA assumptions
+check_anova_assumptions <- function(anova_results) {
+# Extract residuals from ANOVA results
+residuals <- resid(anova_results)
+# Check if there are any missing values in the residuals
+if (any(is.na(residuals))) {
+print("There are missing values in the residuals.")
+} else {
+print("There are no missing values in the residuals.")
+}
+# Check if the residuals are numeric
+if (is.numeric(residuals)) {
+print("The residuals are numeric.")
+} else {
+print("The residuals are not numeric.")
+}
+# Check homogeneity of variances using Levene's test
+levene_test <- car::leveneTest(residuals ~ fitted(anova_results))
+print(levene_test)
+# Check normality of residuals using Shapiro-Wilk test
+shapiro_test <- shapiro.test(residuals)
+print(shapiro_test)
+# Plot homogeneity of variances
+plot_homogeneity <- ggplot(data.frame(Residuals = residuals), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+# Plot normal Q-Q plot of the residuals
+qq_plot <- qqnorm(residuals, main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(residuals)
+print(qq_plot)
+}
+check_anova_assumptions(anova_results_S1)
+# Function to check ANOVA assumptions
+check_anova_assumptions <- function(anova_results) {
+# Extract residuals from ANOVA results
+residuals <- as.numeric(resid(anova_results))
+# Check if there are any missing values in the residuals
+if (any(is.na(residuals))) {
+print("There are missing values in the residuals.")
+} else {
+print("There are no missing values in the residuals.")
+}
+# Check if the residuals are numeric
+if (is.numeric(residuals)) {
+print("The residuals are numeric.")
+} else {
+print("The residuals are not numeric.")
+}
+# Check homogeneity of variances using Levene's test
+levene_test <- car::leveneTest(residuals ~ fitted(anova_results))
+print(levene_test)
+# Check normality of residuals using Shapiro-Wilk test
+shapiro_test <- shapiro.test(residuals)
+print(shapiro_test)
+# Plot homogeneity of variances
+plot_homogeneity <- ggplot(data.frame(Residuals = residuals), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+# Plot normal Q-Q plot of the residuals
+qq_plot <- qqnorm(residuals, main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(residuals)
+print(qq_plot)
+}
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+source(file = "../R/HUEL_satiety_functions.R")
+check_anova_assumptions(anova_results_S1)
+# Function to check ANOVA assumptions
+check_anova_assumptions <- function(anova_results) {
+# Extract residuals from ANOVA results
+residuals <- as.numeric(resid(anova_results))
+# Check if there are any missing values in the residuals
+if (any(is.na(residuals))) {
+print("There are missing values in the residuals.")
+} else {
+print("There are no missing values in the residuals.")
+}
+# Check if the residuals are numeric
+if (is.numeric(residuals)) {
+print("The residuals are numeric.")
+} else {
+print("The residuals are not numeric.")
+}
+# Check homogeneity of variances using Levene's test
+levene_test <- car::leveneTest(residuals ~ rep(1, length(residuals)))
+print(levene_test)
+# Check normality of residuals using Shapiro-Wilk test
+shapiro_test <- shapiro.test(residuals)
+print(shapiro_test)
+# Plot homogeneity of variances
+plot_homogeneity <- ggplot(data.frame(Residuals = residuals), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+# Plot normal Q-Q plot of the residuals
+qq_plot <- qqnorm(residuals, main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(residuals)
+print(qq_plot)
+}
+check_anova_assumptions(anova_results_S1)
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+View(S1_subset_data)
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+print(summary(S1_anova_results))
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint , data = S1_subset_data)
+print(summary(S1_anova_results))
+shapiro.test(resid(S1_anova_results))
+two_way_anova_results <- run_two_way_anova(Satiety_long, question = "S1")
+shapiro.test(resid(S1_anova_results))
+levene_test <- leveneTest(resid(S1_anova_results))
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+print(plot_homogeneity)
+levene_test <- leveneTest(resid(S1_anova_results))
+qq_plot <- qqnorm(resid(S1_anova_results), main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(resid(S1_anova_results))
+qq_line <- qqline(resid(S1_anova_results))
+qq_plot <- qqnorm(resid(S1_anova_results), main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(resid(S1_anova_results))
+levene_test <- leveneTest(resid(S1_anova_results))
+group <- rep(1, length(resid(S1_anova_results)))
+# Perform Levene's test
+levene_test <- leveneTest(resid(S1_anova_results) ~ group)
+leveneTest(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+#| layout-ncol: 2
+#Check assumptions
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+qq_plot <- qqnorm(resid(S1_anova_results), main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(resid(S1_anova_results))
+shapiro.test(resid(S1_anova_results))
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(car)
+# Read the cleaned Satiety Study
+Satiety <- read_excel("../Input/HUEL_satiety_input.xlsx")
+#load function
+source(file = "../R/HUEL_satiety_functions.R")
+# Create an interactive table
+datatable(Satiety, filter = "top")
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+result_huel_s1 <- calculate_mean_sd(Satiety, intervention = "HUEL", question = "S1")
+result_cornflakes_s1 <- calculate_mean_sd(Satiety, intervention = "Cornflakes", question = "S1")
+combine_and_display_results(result_huel_s1, result_cornflakes_s1)
+# create a long format
+Satiety_long <- Satiety %>%
+pivot_longer(cols = starts_with("HUEL_") | starts_with("Cornflakes_"), names_to = "Timepoint", values_to = "Measurement")
+# Create Intervention column based on Timepoint
+Satiety_long <- Satiety_long %>%
+mutate(Intervention = ifelse(str_detect(Timepoint, "^HUEL"), "HUEL", "Cornflakes"),
+Timepoint = gsub("^HUEL_|^Cornflakes_", "", Timepoint),
+Question = gsub("_.*", "", Timepoint),
+Timepoint = gsub("^S\\d+_", "", Timepoint))
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+print(summary(S1_anova_results))
+#| layout-ncol: 2
+#Check assumptions
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+qq_plot <- qqnorm(resid(S1_anova_results), main = "Normal Q-Q Plot of Residuals")
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+print(summary(S1_anova_results))
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+shapiro.test(resid(S1_anova_results))
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+View(anova_results_S1)
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(car)
+# Read the cleaned Satiety Study
+Satiety <- read_excel("../Input/HUEL_satiety_input.xlsx")
+#load function
+source(file = "../R/HUEL_satiety_functions.R")
+# Create an interactive table
+datatable(Satiety, filter = "top")
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+result_huel_s1 <- calculate_mean_sd(Satiety, intervention = "HUEL", question = "S1")
+result_cornflakes_s1 <- calculate_mean_sd(Satiety, intervention = "Cornflakes", question = "S1")
+combine_and_display_results(result_huel_s1, result_cornflakes_s1)
+# create a long format
+Satiety_long <- Satiety %>%
+pivot_longer(cols = starts_with("HUEL_") | starts_with("Cornflakes_"), names_to = "Timepoint", values_to = "Measurement")
+# Create Intervention column based on Timepoint
+Satiety_long <- Satiety_long %>%
+mutate(Intervention = ifelse(str_detect(Timepoint, "^HUEL"), "HUEL", "Cornflakes"),
+Timepoint = gsub("^HUEL_|^Cornflakes_", "", Timepoint),
+Question = gsub("_.*", "", Timepoint),
+Timepoint = gsub("^S\\d+_", "", Timepoint))
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+print(summary(S1_anova_results))
+#| layout-ncol: 2
+#Check assumptions
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+# Store residuals in the ANOVA results object
+S1_anova_results$residuals <- resid(S1_anova_results)
+print(summary(S1_anova_results))
+#| layout-ncol: 2
+#Check assumptions
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+View(S1_anova_results)
+residuals <- residuals(S1_anova_results)
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+residuals <- residuals(S1_anova_results)
+plot_homogeneity <- ggplot(data.frame(Residuals = residuals), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+residuals <- residuals(S1_anova_results)
+print(summary(S1_anova_results))
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+residuals <- residuals(S1_anova_results)
+print(summary(S1_anova_results))
+#| layout-ncol: 2
+#Check assumptions
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)
+qq_plot <- qqnorm(resid(S1_anova_results), main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(resid(S1_anova_results))
+shapiro.test(resid(S1_anova_results))
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant), data = S1_subset_data)
+residuals <- residuals(S1_anova_results)
+print(summary(S1_anova_results))
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+residuals <- residuals(S1_anova_results)
+print(summary(S1_anova_results))
+View(S1_subset_data)
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(car)
+# Read the cleaned Satiety Study
+Satiety <- read_excel("../Input/HUEL_satiety_input.xlsx")
+#load function
+source(file = "../R/HUEL_satiety_functions.R")
+# Create an interactive table
+datatable(Satiety, filter = "top")
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+result_huel_s1 <- calculate_mean_sd(Satiety, intervention = "HUEL", question = "S1")
+result_cornflakes_s1 <- calculate_mean_sd(Satiety, intervention = "Cornflakes", question = "S1")
+combine_and_display_results(result_huel_s1, result_cornflakes_s1)
+# create a long format
+Satiety_long <- Satiety %>%
+pivot_longer(cols = starts_with("HUEL_") | starts_with("Cornflakes_"), names_to = "Timepoint", values_to = "Measurement")
+# Create Intervention column based on Timepoint
+Satiety_long <- Satiety_long %>%
+mutate(Intervention = ifelse(str_detect(Timepoint, "^HUEL"), "HUEL", "Cornflakes"),
+Timepoint = gsub("^HUEL_|^Cornflakes_", "", Timepoint),
+Question = gsub("_.*", "", Timepoint),
+Timepoint = gsub("^S\\d+_", "", Timepoint))
+#Subset the question
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+# 2 way ANOVA
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+residuals <- residuals(S1_anova_results)
+print(summary(S1_anova_results))
+#| layout-ncol: 2
+#Check assumptions
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+geom_boxplot() +
+labs(title = "Homogeneity of Variances", y = "Residuals") +
+theme_minimal()
+print(plot_homogeneity)

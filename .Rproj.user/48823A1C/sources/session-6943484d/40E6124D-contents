@@ -1,0 +1,136 @@
+# HUEL Satiety Functions
+
+# function for calculating mean, SD for intervention and satiety question 
+
+calculate_mean_sd <- function(data, intervention, question) {
+  cols <- grep(paste0(intervention, "_", question), names(data), value = TRUE)
+  subset_data <- data[, cols]
+  mean_values <- apply(subset_data, 2, mean, na.rm = TRUE)
+  sd_values <- apply(subset_data, 2, sd, na.rm = TRUE)
+  result <- data.frame(mean = mean_values, sd = sd_values)
+  return(result)
+}
+
+combine_and_display_results <- function(result_huel, result_cornflakes) {
+  # Extract timepoints from row names
+  timepoints_huel <- gsub("^HUEL_", "", row.names(result_huel))
+  timepoints_cornflakes <- gsub("^Cornflakes_", "", row.names(result_cornflakes))
+  
+  # Combine the results into a single data frame
+  result_combined <- data.frame(
+    Timepoint = c(timepoints_huel, timepoints_cornflakes),
+    Mean_HUEL = result_huel$mean,
+    SD_HUEL = result_huel$sd,
+    Mean_Cornflakes = result_cornflakes$mean,
+    SD_Cornflakes = result_cornflakes$sd
+  )
+  
+  # Round the means and standard deviations to one decimal place
+  result_combined[, c("Mean_HUEL", "SD_HUEL", "Mean_Cornflakes", "SD_Cornflakes")] <- 
+    round(result_combined[, c("Mean_HUEL", "SD_HUEL", "Mean_Cornflakes", "SD_Cornflakes")], 1)
+  
+  result_combined$Timepoint <- factor(result_combined$Timepoint, levels = unique(c("S1_0", "S1_15", "S1_30", "S1_45", "S1_60", "S1_90", "S1_120", "S1_150", "S1_180", "S1_210", "S1_240")))
+  
+  # Remove duplicates and keep only unique timepoints
+  result_combined <- result_combined[!duplicated(result_combined$Timepoint), ]
+  
+  # Display the table
+  print(kable(result_combined, format = "markdown"))
+  
+  # Create the plot
+  plot <- ggplot(result_combined, aes(x = Timepoint)) +
+    geom_point(aes(y = Mean_HUEL, color = "HUEL"), position = position_dodge(width = 0.5), size = 3) +
+    geom_errorbar(aes(ymin = Mean_HUEL - SD_HUEL, ymax = Mean_HUEL + SD_HUEL, color = "HUEL"), width = 0.2, position = position_dodge(width = 0.5)) +
+    geom_point(aes(y = Mean_Cornflakes, color = "Cornflakes"), position = position_dodge(width = 0.5), size = 3) +
+    geom_errorbar(aes(ymin = Mean_Cornflakes - SD_Cornflakes, ymax = Mean_Cornflakes + SD_Cornflakes, color = "Cornflakes"), width = 0.2, position = position_dodge(width = 0.5)) +
+    labs(title = "Mean and Standard Deviation", x = "Timepoint", y = "Mean") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    ylim(0, 100) +  # Set y-axis range from 0 to 100
+    scale_color_manual(values = c("HUEL" = "blue", "Cornflakes" = "red"))
+  
+  # Display the plot
+  print(plot)
+}
+
+
+
+# Function to subset data
+
+subset_data <- function(data, Question){
+  subset_data <- data %>%
+    filter(Question == Question) %>%
+    select(Participant, Timepoint, Measurement, Intervention, Question)
+  
+  return(subset_data)
+}
+
+# Function to perform two-way ANOVA, check assumptions, and plot diagnostic graphs
+two_way_anova_with_plots <- function(data) {
+  # Perform two-way ANOVA
+  anova_results <- aov(Measurement ~ Intervention * Timepoint, data = data)
+  
+  # Check assumptions
+  # 1. Homogeneity of variances
+  levene_test <- car::leveneTest(residuals(anova_results) ~ Intervention * Timepoint, data = data)
+  homogeneity_passed <- levene_test$p.value > 0.05
+  
+  # Print levene_test and its p-value
+  print(levene_test)
+  print(levene_test$p.value)
+  
+  
+  # 2. Independence of residuals
+  independence_test <- !cor.test(residuals(anova_results)[-1], residuals(anova_results)[-length(residuals(anova_results))])$p.value > 0.05
+  
+  # Set smaller plot margins
+  par(mar = c(4, 4, 2, 2))  # Set top, bottom, left, and right margins
+  
+  # Diagnostic plots
+  plot1 <- plot(anova_results, 1)  # Residuals vs. Fitted
+  plot2 <- plot(anova_results, 2)  # Normal Q-Q plot
+  plot3 <- plot(anova_results, 3)  # Scale-Location plot
+  plot4 <- plot(anova_results, 4)  # Residuals vs. Leverage
+  
+  # Store plots in a list
+  plots <- list(Residuals_vs_Fitted = plot1,
+                QQ_Plot = plot2,
+                Scale_Location_Plot = plot3,
+                Residuals_vs_Leverage = plot4)
+  
+  # Store ANOVA results and assumptions in a list
+  results <- list(
+    "ANOVA_results" = summary(anova_results),
+    "Homogeneity" = homogeneity_passed,
+    "Independence" = independence_test,
+    "Plots" = plots
+  )
+  
+  # Print ANOVA results
+  print(summary(anova_results))
+  
+  # Print assumption
+  cat("Independence of residuals:", independence_test, "\n")
+  
+  # Return the results
+  return(results)
+}
+
+#Function to perform linear mixed model where we account for participants, as well as assumptions
+
+
+lmm_with_plots <- function(data) {
+  # Perform linear mixed-effects model
+  lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = data)
+  
+  # Print ANOVA results
+  print(anova(lmer_model))
+  
+  # Check model assumptions
+  
+  model_check <- check_model(lmer_model)
+  
+  print(model_check)
+  
+}
+

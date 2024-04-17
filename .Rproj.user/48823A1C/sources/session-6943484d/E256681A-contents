@@ -1,0 +1,139 @@
+---
+title: "HUEL Satiety"
+author: "Guy Taylor"
+date: today
+format: html
+toc: true
+toc-location: left
+toc-title: ""
+number-sections: true
+code-fold: true
+code-summary: "Show the code"
+fig-cap-location: margin
+title-block-banner: "#1e1e3f"
+title-block-banner-color: "#f6eff1"
+css: style.css
+---
+
+# Analysis of the Satiety Questionnaire
+
+## Load Libraries
+
+```{r, warning=FALSE, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(car)
+library(lme4)
+library(lmerTest)
+library(easystats)
+```
+
+## Load Satiety Data
+
+Data is displayed in wide format - each participant has a row - Column format is Intervention_Question_Time format (e.g. HUEL_S1_0 and Cornflakes_S6_180). I currently have not included AP009 as they pulled out, will discuss with Matt
+
+```{r}
+# Read the cleaned Satiety Study
+
+Satiety <- read_excel("../Input/HUEL_satiety_input.xlsx")
+
+
+#load function
+source(file = "../R/HUEL_satiety_functions.R")
+
+# Create an interactive table
+
+datatable(Satiety, filter = "top")
+
+```
+
+# Q1.
+
+![Question 1.](Images/Q1.jpg)
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_huel_s1 <- calculate_mean_sd(Satiety, intervention = "HUEL", question = "S1")
+result_cornflakes_s1 <- calculate_mean_sd(Satiety, intervention = "Cornflakes", question = "S1")
+
+combine_and_display_results(result_huel_s1, result_cornflakes_s1)
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+First converting to long format - this *won't* need repeating on the subsequent analyis
+
+```{r}
+# create a long format
+
+Satiety_long <- Satiety %>%
+    pivot_longer(cols = starts_with("HUEL_") | starts_with("Cornflakes_"), names_to = "Timepoint", values_to = "Measurement")
+
+# Create Intervention column based on Timepoint
+Satiety_long <- Satiety_long %>%
+  mutate(Intervention = ifelse(str_detect(Timepoint, "^HUEL"), "HUEL", "Cornflakes"),
+         Timepoint = gsub("^HUEL_|^Cornflakes_", "", Timepoint),
+         Question = gsub("_.*", "", Timepoint),
+         Timepoint = gsub("^S\\d+_", "", Timepoint))
+
+
+```
+
+
+Then running functions to create and check a *2 way ANOVA* (Intervention (**HUEL or Cornflakes**), Timepoint (**0 to 240 minute**) and Interaction (**Intervention x Timepoint**)) and a *Mixed effects* model (Intervention (**HUEL or Cornflakes**), Timepoint (**0 to 240 minute**) and Interaction (**Intervention x Timepoint**), with random effect of participant 
+
+Unsure whether to do in the mixed effects model: 
+
+(1 | participant) includes random intercepts for participants, capturing individual differences in baseline hunger levels.
+or
+(1 | participant:time) includes random intercepts for the interaction between participants and time, capturing variability in hunger ratings across different time points within each participant. . 
+
+
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S1_subset_data <- subset_data(Satiety_long, "S1")
+
+```
+
+
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r}
+
+S1_anova_results_with_plots <- two_way_anova_with_plots(S1_subset_data)
+
+```
+
+
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S1_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S1_subset_data)
+
+anova(S1_lmer_model)
+
+
+```
+```{r}
+check_model(S1_lmer_model)
+```
+
+

@@ -1,0 +1,144 @@
+---
+title: "Penguin Analysis"
+author: "Guy Taylor"
+date: today
+format: html
+toc: true
+toc-location: left
+toc-title: ""
+number-sections: true
+code-fold: true
+code-summary: "Show the code"
+fig-cap-location: margin
+editor: visual
+title-block-banner: "#1e1e3f"
+title-block-banner-color: "#94ecf0"
+css: style.css
+---
+
+::: {.callout-warning collapse="true"}
+This is my first attempt at this!
+:::
+
+# Productive R Workflow - Penguin Analysis
+
+Course to improve workflow. Practice document on the penguin data set (available [here](https://allisonhorst.github.io/palmerpenguins/))
+
+![chinstrap penguin](https://assets-global.website-files.com/653651d747aa6d138b4303cb/655212278eb107801a7f4db6_5c17637edab5763a81789b77_chinstrap-penguin-2200.jpeg)
+
+## Library
+
+```{r, warning = FALSE, message = FALSE}
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+theme_set(theme_ipsum)
+```
+
+### Data Loading
+
+**Load** clean data and functions
+
+```{r}
+# Read the clean dataset
+data <- readRDS(file = "../input/data_clean.rds")
+
+#load function
+source(file = "functions.R")
+
+#Make a table
+datatable(data, filter = "top")
+```
+
+### Descriptive analytics
+
+**Calculating** the mean bill length for different species and islands using dplyr
+
+```{r}
+
+data %>%
+  filter(species == "Adelie") %>%
+  group_by(island) %>%
+  summarize(mean_bill_length = round(mean(bill_length_mm, na.rm = TRUE), 2))
+
+bill_length_per_species <- data %>% group_by(species) %>% summarise(average_bill_length = mean(bill_length_mm, na.rm = TRUE))
+            
+kable(bill_length_per_species)
+```
+
+Using a *function* to create a scatter
+
+```{r, fig.width = 9, fig.height = 9, fig.align='center'}
+#Scatter of Adelie vs Torgesen
+scatter(data, "Adelie", "Torgersen")
+```
+
+```{r, fig.width = 9, fig.height = 9, fig.align='center'}
+CD <- scatter(data, "Chinstrap", "Dream")
+
+ggplotly(CD)
+```
+
+```{r}
+#| layout-ncol: 2
+
+
+scatter(data, "Adelie", "Dream")
+scatter(data, "Adelie", "Biscoe")
+```
+
+```{r}
+#| layout-ncol: 2
+
+data %>% 
+  group_by(species) %>%
+  summarise(average_bill_length = mean(bill_length_mm, na.rm = TRUE))
+bill_length_adelie <- data %>% 
+  group_by(species) %>% 
+  summarise(average_bill_length = mean(bill_length_mm, na.rm = TRUE)) %>% 
+  filter(species == "Adelie") %>% 
+  pull (average_bill_length) %>% 
+  round(2)
+
+data %>% 
+  group_by(species) %>%
+  summarise(average_bill_deph = mean(bill_depth_mm, na.rm = TRUE))
+```
+
+So the average bill length for the species `Adelie` is `r bill_length_adelie`
+
+Lets get back to the **assignment**
+
+![Bill measurement explanation](images/culmen_depth.png){fig-align="center"}
+
+```{r, fig.align='center', fig.width=5, fig.height=5, warning=FALSE, fig.cap= "Relationship between bill length and bill deph"}
+
+data %>%
+  ggplot(
+    aes(x = bill_length_mm, y = bill_depth_mm)
+  ) + 
+  geom_point(color="BLUE") + 
+  labs(
+    x = "Bill length (mm)",
+    y = "Bill Depth (mm) ",
+    Title = "Suprising Relationship?"
+
+  ) +
+  theme_ipsum()
+
+```
+
+Using patchwork to display the three species
+
+```{r, warning=FALSE, fig.height=3, fig.width=9, fig.cap="There is actually a positive correlation when split by species."}
+
+p1 <- create_scatter(data, "Adelie", "#6689c6")
+p2 <- create_scatter(data, "Chinstrap", "#e85252")
+p3 <- create_scatter(data, "Gentoo", "#9a6fb0")
+
+p1 + p2 + p3
+```

@@ -1,0 +1,31 @@
+{
+    "id": "67E3090B",
+    "path": "~/RA/productive-r-workflow/R/Penguin Analysis.qmd",
+    "project_path": null,
+    "type": "quarto_markdown",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1712823772205.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "rmdVisualMode": "false",
+        "rmdVisualWrapConfigured": "true",
+        "source_window_id": "",
+        "Source": "Source",
+        "docOutlineVisible": "1",
+        "rmdVisualCollapsedChunks": "",
+        "rmdVisualModeLocation": "32:0",
+        "cursorPosition": "86,0",
+        "scrollLine": "78"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1711662640,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1711662640,
+    "read_only": false,
+    "read_only_alternatives": []
+}

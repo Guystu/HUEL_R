@@ -1,0 +1,33 @@
+{
+    "id": "AE90B158",
+    "path": "~/RA/HUEL/HUEL_R/R/HUEL_Satiety.qmd",
+    "project_path": "R/HUEL_Satiety.qmd",
+    "type": "quarto_markdown",
+    "hash": "935724278",
+    "contents": "",
+    "dirty": false,
+    "created": 1712842412146.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "rmdVisualMode": "false",
+        "rmdVisualWrapConfigured": "true",
+        "tempName": "Untitled1",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "101,0",
+        "scrollLine": "87",
+        "docOutlineVisible": "1",
+        "rmdVisualModeLocation": "2:893.3333129882812",
+        "rmdVisualCollapsedChunks": "",
+        "docOutlineSize": "11"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1712857969,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1712857970260,
+    "read_only": false,
+    "read_only_alternatives": []
+}

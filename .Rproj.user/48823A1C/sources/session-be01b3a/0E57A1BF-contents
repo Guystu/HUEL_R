@@ -1,0 +1,71 @@
+---
+title: "HUEL Satiety"
+author: "Guy Taylor"
+date: today
+format: html
+toc: true
+toc-location: left
+toc-title: ""
+number-sections: true
+code-fold: true
+code-summary: "Show the code"
+fig-cap-location: margin
+editor: visual
+title-block-banner: "#1e1e3f"
+title-block-banner-color: "#f6eff1"
+css: style.css
+---
+
+# Analysis of the Satiety Questionnaire
+
+## Load Libraries
+
+```{r, warning=FALSE, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(car)
+```
+
+## Load Satiety Data
+
+Data is displayed in wide format - each participant has a row - Column format is Intervention_Question_Time format (e.g. HUEL_S1_0 and Cornflakes_S6_180). I currently have not included AP009 as they pulled out, will discuss with Matt
+
+```{r}
+# Read the cleaned Satiety Study
+
+Satiety <- read_excel("../Input/HUEL_satiety_input.xlsx")
+
+#load function
+source(file = "../R/HUEL_satiety_functions.R")
+
+# Create an interactive table
+
+datatable(Satiety, filter = "top")
+
+```
+
+# Q1.
+
+![Question 1.](Images/Q1.jpg)
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_huel_s1 <- calculate_mean_sd(Satiety, intervention = "HUEL", question = "S1")
+result_cornflakes_s1 <- calculate_mean_sd(Satiety, intervention = "Cornflakes", question = "S1")
+
+combine_and_display_results(result_huel_s1, result_cornflakes_s1)
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+\`\`\`{r} Satiety_long \<- Satiety %\>% pivot_longer(cols = starts_with("HUEL\_") \| starts_with("Cornflakes\_"), names_to = "Timepoint", values_to = "Measurement")

@@ -1,0 +1,548 @@
+---
+title: "HUEL Satiety"
+author: "Guy Taylor"
+date: today
+format: html
+toc: true
+toc-location: left
+toc-title: ""
+number-sections: true
+code-fold: true
+code-summary: "Show the code"
+fig-cap-location: margin
+title-block-banner: "#1e1e5f"
+title-block-banner-color: "#f6eff1"
+css: style.css
+---
+
+# Analysis of the Satiety Questionnaire
+
+## Load Libraries
+
+```{r, warning=FALSE, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(car)
+library(lme4)
+library(lmerTest)
+library(easystats)
+```
+
+## Load Satiety Data
+
+Data is displayed in wide format - each participant has a row - Column format is Intervention_Question_Time format (e.g. HUEL_S1_0 and Cornflakes_S6_180). I currently have not included AP009 as they pulled out, will discuss with Matt
+
+```{r}
+# Read the cleaned Satiety Study
+
+Satiety <- read_excel("../Input/HUEL_satiety_input.xlsx")
+
+
+#load function
+source(file = "../R/HUEL_satiety_functions.R")
+
+# Create an interactive table
+
+datatable(Satiety, filter = "top")
+
+```
+
+Lets convert to long format - this *won't* need repeating on the subsequent analysis
+
+```{r}
+# create a long format
+
+Satiety_long <- Satiety %>%
+    pivot_longer(cols = starts_with("HUEL_") | starts_with("Cornflakes_"), names_to = "Timepoint", values_to = "Measurement")
+
+# Create Intervention column based on Timepoint
+Satiety_long <- Satiety_long %>%
+  mutate(Intervention = ifelse(str_detect(Timepoint, "^HUEL"), "HUEL", "Cornflakes"),
+         Timepoint = gsub("^HUEL_|^Cornflakes_", "", Timepoint),
+         Question = gsub("_.*", "", Timepoint),
+         Timepoint = gsub("^S\\d+_", "", Timepoint))
+
+
+```
+
+# Q1.
+
+![Question 1.](Images/Q1.jpg)
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S1_subset_data <- subset_data(Satiety_long, "S1")
+
+```
+
+Then mean +- SD and a graph:
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_S1 <- calculate_mean_sd(Satiety_long, question = "S1")
+
+kable(result_S1)
+
+plot <- plot_mean_sd(result_S1)
+
+print(plot)
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then running functions to create and check a *2 way ANOVA* (Intervention (**HUEL or Cornflakes**), Timepoint (**0 to 240 minute**) and Interaction (**Intervention x Timepoint**)) and a *Mixed effects* model (Intervention (**HUEL or Cornflakes**), Timepoint (**0 to 240 minute**) and Interaction (**Intervention x Timepoint**), with random effect of participant
+
+Unsure whether to do in the mixed effects model:
+
+(1 \| participant) includes random intercepts for participants, capturing individual differences in baseline hunger levels. or (1 \| participant:time) includes random intercepts for the interaction between participants and time, capturing variability in hunger ratings across different time points within each participant. .
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S1_anova_results_with_plots <- two_way_anova_with_plots(S1_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S1_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S1_subset_data)
+
+anova(S1_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S1_lmer_model)
+```
+
+Looks like the data will need to be transformed....
+
+# Q2.
+
+![Question 2.](Images/Q2.jpg)
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S2_subset_data <- subset_data(Satiety_long, "S2")
+
+```
+
+means and graph
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S2, 0 to 240 minutes
+
+
+result_S2 <- calculate_mean_sd(Satiety_long, question = "S2")
+
+kable(result_S2)
+
+plot <- plot_mean_sd(result_S2)
+
+print(plot)
+
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S2_anova_results_with_plots <- two_way_anova_with_plots(S2_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S2_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S2_subset_data)
+
+anova(S2_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S2_lmer_model)
+```
+
+# Q3
+
+![Question 3.](Images/Q3.jpg)
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S3_subset_data <- subset_data(Satiety_long, "S3")
+
+```
+
+Then means and graph
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_S3 <- calculate_mean_sd(Satiety_long, question = "S3")
+
+kable(result_S1)
+
+plot <- plot_mean_sd(result_S3)
+
+print(plot)
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S3_anova_results_with_plots <- two_way_anova_with_plots(S3_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S3_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S3_subset_data)
+
+anova(S3_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S3_lmer_model)
+```
+
+# Q4
+
+![Question 4.](Images/Q4.jpg)
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S4_subset_data <- subset_data(Satiety_long, "S4")
+
+```
+
+Mean and graph:
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_S4 <- calculate_mean_sd(Satiety_long, question = "S4")
+
+kable(result_S1)
+
+plot <- plot_mean_sd(result_S4)
+
+print(plot)
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S4_anova_results_with_plots <- two_way_anova_with_plots(S4_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S4_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S4_subset_data)
+
+anova(S4_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S4_lmer_model)
+```
+
+# Q5
+
+![Question 5.](Images/Q5.jpg)
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S5_subset_data <- subset_data(Satiety_long, "S5")
+
+```
+
+Mean and graph
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_S5 <- calculate_mean_sd(Satiety_long, question = "S5")
+
+kable(result_S1)
+
+plot <- plot_mean_sd(result_S5)
+
+print(plot)
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S5_anova_results_with_plots <- two_way_anova_with_plots(S5_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S5_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S5_subset_data)
+
+anova(S5_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S5_lmer_model)
+```
+
+# Q6
+
+![Question 6.](Images/Q6.jpg)
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_S6 <- calculate_mean_sd(Satiety_long, question = "S6")
+
+kable(result_S1)
+
+plot <- plot_mean_sd(result_S6)
+
+print(plot)
+
+```
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S6_subset_data <- subset_data(Satiety_long, "S6")
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S6_anova_results_with_plots <- two_way_anova_with_plots(S6_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S6_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S6_subset_data)
+
+anova(S6_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S6_lmer_model)
+```
+
+# Q7
+
+![Question 7.](Images/Q7.jpg)
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_S7 <- calculate_mean_sd(Satiety_long, question = "S7")
+
+kable(result_S1)
+
+plot <- plot_mean_sd(result_S7)
+
+print(plot)
+
+```
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S7_subset_data <- subset_data(Satiety_long, "S7")
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S7_anova_results_with_plots <- two_way_anova_with_plots(S7_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S7_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S7_subset_data)
+
+anova(S7_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S7_lmer_model)
+```
+
+# Q8
+
+![Question 8.](Images/Q8.jpg)
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_S8 <- calculate_mean_sd(Satiety_long, question = "S8")
+
+kable(result_S1)
+
+plot <- plot_mean_sd(result_S8)
+
+print(plot)
+
+```
+
+First subset the question:
+
+```{r}
+
+#Subset the question
+
+S8_subset_data <- subset_data(Satiety_long, "S8")
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+Then a *2 way ANOVA* and **assumptions**
+
+```{r, fig.width=5, fig.height=5}
+
+#| layout-ncol: 2
+
+S8_anova_results_with_plots <- two_way_anova_with_plots(S8_subset_data)
+
+```
+
+## linear mixed model and assumptions
+
+And let's try *linear mixed model* instead where we account for **participants**, as well as **assumptions**
+
+```{r}
+
+S8_lmer_model <- lmer(Measurement ~ Timepoint * Intervention + (1|Participant), data = S8_subset_data)
+
+anova(S8_lmer_model)
+
+
+```
+
+```{r, , fig.width=8, fig.height=16}
+check_model(S8_lmer_model)
+```

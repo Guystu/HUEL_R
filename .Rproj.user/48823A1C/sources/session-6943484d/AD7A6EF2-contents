@@ -1,0 +1,10 @@
+# Example data in long format
+participant <- rep(1:40, each = 22)  # 40 participants, each with 22 observations (11 time points for each of 2 conditions)
+time <- rep(c(0, 15, 30, 45, 60, 90, 120, 150, 180, 210, 240), times = 80)  # Time points
+food <- rep(rep(c("Huel", "Cornflakes"), each = 11), times = 20)  # Type of food
+hunger <- c(5, 4, 3, 3, 2, 2, 2, 1, 1, 1, 1,   # Hunger ratings for Huel (participant 1)
+            6, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2)
+            
+            # Combine into a data frame
+data <- data.frame(participant = participant, time = time, food = food, hunger = hunger)
+            

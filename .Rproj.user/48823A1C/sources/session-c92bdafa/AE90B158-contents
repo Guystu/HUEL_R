@@ -1,0 +1,136 @@
+---
+title: "HUEL Satiety"
+author: "Guy Taylor"
+date: today
+format: html
+toc: true
+toc-location: left
+toc-title: ""
+number-sections: true
+code-fold: true
+code-summary: "Show the code"
+fig-cap-location: margin
+title-block-banner: "#1e1e3f"
+title-block-banner-color: "#f6eff1"
+css: style.css
+---
+
+# Analysis of the Satiety Questionnaire
+
+## Load Libraries
+
+```{r, warning=FALSE, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(patchwork)
+library(hrbrthemes)
+library(DT)
+library(knitr)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(car)
+```
+
+## Load Satiety Data
+
+Data is displayed in wide format - each participant has a row - Column format is Intervention_Question_Time format (e.g. HUEL_S1_0 and Cornflakes_S6_180). I currently have not included AP009 as they pulled out, will discuss with Matt
+
+```{r}
+# Read the cleaned Satiety Study
+
+Satiety <- read_excel("../Input/HUEL_satiety_input.xlsx")
+
+
+#load function
+source(file = "../R/HUEL_satiety_functions.R")
+
+# Create an interactive table
+
+datatable(Satiety, filter = "top")
+
+```
+
+# Q1.
+
+![Question 1.](Images/Q1.jpg)
+
+```{r}
+# create mean +- SD table for HUEL and Cornflakes S1, 0 to 240 minutes
+
+
+result_huel_s1 <- calculate_mean_sd(Satiety, intervention = "HUEL", question = "S1")
+result_cornflakes_s1 <- calculate_mean_sd(Satiety, intervention = "Cornflakes", question = "S1")
+
+combine_and_display_results(result_huel_s1, result_cornflakes_s1)
+
+```
+
+## 2 Way ANOVA and Checking the assumptions
+
+First converting to long format - this *won't* need repeating on the subsequent analyis
+
+```{r}
+# create a long format
+
+Satiety_long <- Satiety %>%
+    pivot_longer(cols = starts_with("HUEL_") | starts_with("Cornflakes_"), names_to = "Timepoint", values_to = "Measurement")
+
+# Create Intervention column based on Timepoint
+Satiety_long <- Satiety_long %>%
+  mutate(Intervention = ifelse(str_detect(Timepoint, "^HUEL"), "HUEL", "Cornflakes"),
+         Timepoint = gsub("^HUEL_|^Cornflakes_", "", Timepoint),
+         Question = gsub("_.*", "", Timepoint),
+         Timepoint = gsub("^S\\d+_", "", Timepoint))
+
+
+```
+
+
+Then running a function to create model. 
+
+Results show *significant* group (p<0.001) and time (p<0.001) effects, but no interaction (p=0.533)
+
+```{r}
+
+#Subset the question
+
+S1_subset_data <- filter(Satiety_long, Question == "S1")
+
+# 2 way ANOVA
+
+S1_anova_results <- aov(Measurement ~ Intervention * Timepoint + Error(Participant/Timepoint), data = S1_subset_data)
+
+residuals <- residuals(S1_anova_results)
+
+
+print(summary(S1_anova_results))
+
+```
+
+
+```{r}
+
+#| layout-ncol: 2
+
+#Check assumptions
+
+leveneTest(Measurement ~ Intervention * Timepoint, data = S1_subset_data)
+
+plot_homogeneity <- ggplot(data.frame(Residuals = resid(S1_anova_results)), aes(y = Residuals)) +
+  geom_boxplot() +
+  labs(title = "Homogeneity of Variances", y = "Residuals") +
+  theme_minimal()
+print(plot_homogeneity)
+
+qq_plot <- qqnorm(resid(S1_anova_results), main = "Normal Q-Q Plot of Residuals")
+qq_line <- qqline(resid(S1_anova_results))
+
+shapiro.test(resid(S1_anova_results))
+
+```
+
+
+
+```
+

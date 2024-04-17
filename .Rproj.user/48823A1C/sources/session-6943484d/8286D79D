@@ -1,0 +1,28 @@
+{
+    "id": "8286D79D",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1712923691860.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "id": "dd282c6ae49c4736a502a166f5324e3d",
+        "name": "S1_anova_results_with_plots",
+        "title": "S1_anova_results_with_plots",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 866100589138168032,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1712923691860,
+    "read_only": false,
+    "read_only_alternatives": []
+}

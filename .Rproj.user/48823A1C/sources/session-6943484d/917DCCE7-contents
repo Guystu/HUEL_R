@@ -1,0 +1,1320 @@
+setwd("~/OneDrive - Newcastle University/T1DEXI/Data/T1DEXI R/T1DEXI")
+
+library("data.table")
+library("lattice") # for some of the plots
+library("scico") # safe colour palettes
+library("gridExtra") # show a list of figures
+library("plotrix") # for barplot with a gap
+library("nlme") # for linear mixed model (lme)
+library("dunn.test")
+library("ggplot2")
+library("car")
+
+
+
+glucose <- fread("glucoseSmall.txt")[LBCAT == "CGM"]
+demographics <- fread("demographicsSmall.txt")[
+  USUBJID %in% unique(glucose$USUBJID)]
+ageofdiagnosis <- fread("diabetesOnsetSmall.txt")[
+  USUBJID %in% unique(glucose$USUBJID)]
+insmod <- fread("insulinModality.txt")[
+  USUBJID %in% unique(glucose$USUBJID)]
+
+ageofdiagnosis[, endotype :=
+                 ifelse(ageofdiagnosis$FASTRESU == "MONTHS", 1,
+                        ifelse(ageofdiagnosis$FASTRESN < 7, 1,
+                               ifelse(ageofdiagnosis$FASTRESN < 13, 1.5,
+                                      ifelse(ageofdiagnosis$FASTRESN < 30, 2, 3))))]
+## Collect subjects who were diagnosed more than 5 years ago
+demog <- 
+  merge(demographics, ageofdiagnosis)[
+    , .(subject = USUBJID,
+        monthoryear = FASTRESU,
+        ysincediag = AGE - FASTRESN,
+        AgeDX = FASTRESN,
+        USUBJID, SEX, ARMCD, AGE, endotype)][
+          monthoryear == "MONTHS" | ysincediag > 5,
+          .(USUBJID, SEX, ARMCD, AGE, endotype, ysincediag, AgeDX)]
+demog <- merge(demog, insmod)
+demog[, index := 1:.N, by=.(endotype, DXTRT)]
+demog[, endotype := as.factor(endotype)]
+demog[, technology := factor(DXTRT,
+                             levels=c("CLOSED LOOP INSULIN PUMP",
+                                      "INSULIN PUMP",
+                                      "MULTIPLE DAILY INJECTIONS"),
+                             labels=c("Closed loop",
+                                      "Insulin pump",
+                                      "Daily injections"))]
+
+## Only keep those subjects who were diagnosed more than 5 years ago
+## 423 out of 497
+glucose <- glucose[USUBJID %in% demog$USUBJID]
+
+## Add glycaemic state to each of the CGM measurements
+glucose[, state := factor(ifelse(LBORRES / 18 < 3, "hypo2",
+                                 ifelse(LBORRES / 18 < 3.9, "hypo1",
+                                        ifelse(LBORRES / 18 < 10, "normal",
+                                               ifelse(LBORRES / 18 <= 13.9, "hyper1",
+                                                      "hyper2")))),
+                          levels = c("hypo2", "hypo1", "normal",
+                                     "hyper1", "hyper2"))]
+glucose[, threestate := factor(ifelse(LBORRES / 18 < 3.9, "hypo",
+                                      ifelse(LBORRES / 18 < 10, "normal",
+                                             "hyper")),
+                               levels = c("hypo", "normal", "hyper"))]
+## Calculate mmol/L from mg/dL
+glucose[, mmolL := LBORRES/18]
+## Add the day (without the timestamp)
+glucose[, day := as.Date(LBDTC)]
+## Count the number of measurements per day
+glucose[, Ntoday := .N, by=.(USUBJID, day)]
+
+gd <- 
+  merge(glucose[, .(USUBJID, LBDTC, state, threestate, mmolL, day, Ntoday)],
+        demog[, .(USUBJID, SEX, AGE, endotype, AgeDX, ysincediag, technology, index)])
+
+day.length <-
+  gd[, .(minutes = difftime(max(LBDTC), min(LBDTC), units="mins")),
+     by=.(USUBJID, day)]
+day.length
+
+long.enough.days <- day.length[minutes >= 1152, .(USUBJID, day)]
+too.short.days <- day.length[minutes < 1152, .(USUBJID, day)]
+## subset the CGM data to have only days with measuremtns across a
+## long enough time period
+gd.days <- gd[long.enough.days, on=.(USUBJID, day)]
+
+## difftime(LBDTC, shift(LBDTC)) does "LBDT - shift(LBDTC)", where
+## shift(LBDTC) is the previous measurement. So this calculates the
+## time between two measurements. Then we compare it to
+## "as.difftime(120, units="mins")"; "difftime" is the class you get
+## when you subtract one time from another, and here we make a
+## variable that is "a difference of 2 hours", basically.
+check.gaps <-
+  gd.days[
+    , .(noGap = max(difftime(LBDTC, shift(LBDTC), units = "mins"),
+                    na.rm=TRUE) < as.difftime(120, units="mins")),
+    by = .(USUBJID, day)]
+## The column "noGap" is FALSE if there is a gap of at least 2 hours
+## in that day
+check.gaps[noGap == TRUE, .(USUBJID, day)]
+
+gd.days <- 
+  gd.days[check.gaps[noGap == TRUE, .(USUBJID, day)],
+          on = .(USUBJID, day)]
+
+nDays <- 
+  gd.days[, unique(day), by = USUBJID][, .(nDays = .N), by=USUBJID]
+nDays[nDays < 10]
+
+gd <- gd.days[USUBJID %in% nDays[nDays >= 10, USUBJID]]
+
+with(unique(gd[, .(technology, endotype), by=USUBJID]),
+     table(technology, endotype))
+
+  influenceIndexPlot(TIR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+  influenceIndexPlot(TIR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+.day <-
+  gd[Ntoday > 100, .(hypo2 = sum(state == "hypo2") / .N,
+                     hypo1 = sum(state == "hypo1") / .N,
+                     normal = sum(state == "normal") / .N,
+                     hyper1 = sum(state == "hyper1") / .N,
+                     hyper2 = sum(state == "hyper2") / .N),
+     by=.(USUBJID, day, SEX, AGE, endotype, ysincediag, technology, AgeDX)]
+  influenceIndexPlot(TIR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+.day
+
+
+  influenceIndexPlot(TIR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+ <- .day[, .(hypo2 = mean(hypo2),
+                    hypo1 = mean(hypo1),
+                    normal = mean(normal),
+                    hyper1 = mean(hyper1),
+                    hyper2 = mean(hyper2)),
+                by=.(USUBJID, SEX, AGE,
+                     endotype, ysincediag, technology, AgeDX)]
+state.pct
+
+state.pct[, hypo := hypo1+hypo2]
+state.pct[, hyper := hyper1+hyper2]
+
+
+
+range(state.pct[, hypo1 + hypo2 + normal + hyper1 + hyper2, by=USUBJID]$V1)
+
+tabledata <- 
+  rbind(state.pct[, .(meanhypo2=mean(hypo2), sdhypo2=sd(hypo2),
+                      cvhypo2=var(hypo2)/mean(hypo2),
+                      meanhypo1=mean(hypo1), sdhypo1=sd(hypo1),
+                      cvhypo1=var(hypo1)/mean(hypo1),
+                      meanhypo=mean(hypo1+hypo2), sdhypo=sd(hypo1+hypo2),
+                      cvhypo=var(hypo1+hypo2)/mean(hypo1+hypo2),
+                      meannormal=mean(normal), sdnormal=sd(normal),
+                      cvnormal=var(normal)/mean(normal),
+                      meanhyper1=mean(hyper1), sdhyper1=sd(hyper1),
+                      cvhyper1=var(hyper1)/mean(hyper1),
+                      meanhyper2=mean(hyper2), sdhyper2=sd(hyper2),
+                      cvhyper2=var(hyper2)/mean(hyper2),
+                      meanhyper=mean(hyper1+hyper2),
+                      sdhyper=sd(hyper1+hyper2),
+                      cvhyper=var(hyper1+hyper2)/mean(hyper1+hyper2),
+                      .N),
+                  by=.(technology, endotype)],
+        state.pct[, .(meanhypo2=mean(hypo2), sdhypo2=sd(hypo2),
+                      cvhypo2=var(hypo2)/mean(hypo2),
+                      meanhypo1=mean(hypo1), sdhypo1=sd(hypo1),
+                      cvhypo1=var(hypo1)/mean(hypo1),
+                      meanhypo=mean(hypo1+hypo2), sdhypo=sd(hypo1+hypo2),
+                      cvhypo=var(hypo1+hypo2)/mean(hypo1+hypo2),
+                      meannormal=mean(normal), sdnormal=sd(normal),
+                      cvnormal=var(normal)/mean(normal),
+                      meanhyper1=mean(hyper1), sdhyper1=sd(hyper1),
+                      cvhyper1=var(hyper1)/mean(hyper1),
+                      meanhyper2=mean(hyper2), sdhyper2=sd(hyper2),
+                      cvhyper2=var(hyper2)/mean(hyper2),
+                      meanhyper=mean(hyper1+hyper2),
+                      sdhyper=sd(hyper1+hyper2),
+                      cvhyper=var(hyper1+hyper2)/mean(hyper1+hyper2),
+                      technology="Total", .N),
+                  by=.(endotype)],
+        state.pct[, .(meanhypo2=mean(hypo2), sdhypo2=sd(hypo2),
+                      cvhypo2=var(hypo2)/mean(hypo2),
+                      meanhypo1=mean(hypo1), sdhypo1=sd(hypo1),
+                      cvhypo1=var(hypo1)/mean(hypo1),
+                      meanhypo=mean(hypo1+hypo2), sdhypo=sd(hypo1+hypo2),
+                      cvhypo=var(hypo1+hypo2)/mean(hypo1+hypo2),
+                      meannormal=mean(normal), sdnormal=sd(normal),
+                      cvnormal=var(normal)/mean(normal),
+                      meanhyper1=mean(hyper1), sdhyper1=sd(hyper1),
+                      cvhyper1=var(hyper1)/mean(hyper1),
+                      meanhyper2=mean(hyper2), sdhyper2=sd(hyper2),
+                      cvhyper2=var(hyper2)/mean(hyper2),
+                      meanhyper=mean(hyper1+hyper2),
+                      sdhyper=sd(hyper1+hyper2),
+                      cvhyper=var(hyper1+hyper2)/mean(hyper1+hyper2),
+                      endotype="Total", .N),
+                  by=.(technology)],
+        state.pct[, .(meanhypo2=mean(hypo2), sdhypo2=sd(hypo2),
+                      cvhypo2=var(hypo2)/mean(hypo2),
+                      meanhypo1=mean(hypo1), sdhypo1=sd(hypo1),
+                      cvhypo1=var(hypo1)/mean(hypo1),
+                      meanhypo=mean(hypo1+hypo2), sdhypo=sd(hypo1+hypo2),
+                      cvhypo=var(hypo1+hypo2)/mean(hypo1+hypo2),
+                      meannormal=mean(normal), sdnormal=sd(normal),
+                      cvnormal=var(normal)/mean(normal),
+                      meanhyper1=mean(hyper1), sdhyper1=sd(hyper1),
+                      cvhyper1=var(hyper1)/mean(hyper1),
+                      meanhyper2=mean(hyper2), sdhyper2=sd(hyper2),
+                      cvhyper2=var(hyper2)/mean(hyper2),
+                      meanhyper=mean(hyper1+hyper2),
+                      sdhyper=sd(hyper1+hyper2),
+                      cvhyper=var(hyper1+hyper2)/mean(hyper1+hyper2),
+                      endotype="Total", technology="Total",
+                      .N)])
+
+tabledata[, .(technology, endotype,
+              mean=meannormal, sd=sdnormal, cv=cvnormal,
+              N)][order(cv)]
+
+dcast(tabledata[, .(meansd = paste0(signif(meannormal, 3), " (",
+                                    signif(sdnormal, 3), ")")),
+                by=.(technology, endotype)],
+      endotype ~ technology, value.var="meansd")
+
+
+########### correlation ### 24hr - TIR vs AgeDx ############
+
+Eug_AgeDx_correlation <- cor.test(state.pct$AgeDX, state.pct$normal, method = "pearson")
+print(Eug_AgeDx_correlation)
+
+Eug_AgeDx_correlation <- cor.test(state.pct$AgeDX, state.pct$normal, method = "spearman")
+print(Eug_AgeDx_correlation)
+
+
+
+# Load required libraries
+library(ggplot2)  # For plotting
+library(car)      # For diagnostics
+
+# Scatter plot to check linearity
+ggplot(state.pct, aes(x = AgeDX, y = normal)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Age at Diagnosis (AgeDX)", y = "TIR %",
+       title = "Scatter Plot of AgeDX vs TIR")
+
+# Residual plot to check homoscedasticity
+model <- lm(normal ~ AgeDX, data = state.pct)
+residuals <- resid(model)
+fitted_values <- fitted(model)
+plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residual Plot for Homoscedasticity Check")
+
+# Normality test for residuals
+shapiro.test(residuals)
+
+# Q-Q plot for normality of residuals
+qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+
+# Check for outliers
+outlierTest(model)
+
+# Check for influential points
+influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+
+
+##### 24 TIR by endotype KWT
+
+TIR_Endotypes_KWT <- kruskal.test(normal ~ endotype, data = state.pct)
+print(TIR_Endotypes_KWT)
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$normal, state.pct$endotype, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(normal ~ endotype, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check KWT assumptions
+# Residual plot to check homoscedasticity
+plot(TIR_Endotypes_KWT, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TIR_Endotypes_KWT))
+
+# Check for outliers
+outlierTest(TIR_Endotypes_KWT)
+
+# Check for influential points
+influenceIndexPlot(TIR_Endotypes_KWT, id.n = 5)  # Display top 5 influential points
+
+#Insulin-24hr KWT
+
+TIR_technologys_KWT <- kruskal.test(normal ~ technology, data = state.pct)
+print(TIR_technologys_KWT)
+
+TIR_technologys_ANOVA <- aov(normal ~ technology, data = state.pct)
+print(TIR_technologys_ANOVA)
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$normal, state.pct$technology, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(normal ~ technology, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+# Residual plot to check homoscedasticity
+plot(TIR_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TIR_technologys_ANOVA))
+
+# Check for outliers
+outlierTest(TIR_technologys_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TIR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+
+####### 24hr TBR <3.9 ########
+
+Hypo_AgeDx_correlation <- cor.test(state.pct$AgeDX, state.pct$hypo, method = "spearman")
+print(Hypo_AgeDx_correlation)
+
+# Scatter plot to check linearity
+ggplot(state.pct, aes(x = AgeDX, y = hypo)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Age at Diagnosis (AgeDX)", y = "TBR (<3.9) %",
+       title = "Scatter Plot of AgeDX vs TBR")
+
+# Residual plot to check homoscedasticity
+model <- lm(hypo ~ AgeDX, data = state.pct)
+residuals <- resid(model)
+fitted_values <- fitted(model)
+plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residual Plot for Homoscedasticity Check")
+
+# Normality test for residuals
+shapiro.test(residuals)
+
+# Q-Q plot for normality of residuals
+qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+
+# Check for outliers
+outlierTest(model)
+
+# Check for influential points
+influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+
+# 24 TBR (<3.9) by endotype KWT 
+
+TBR_Endotypes_ANOVA <- aov(hypo ~ endotype, data = state.pct)
+print(TBR_Endotypes_ANOVA)
+
+TBR_Endotypes_KWT <- kruskal.test(hypo ~ endotype, data = state.pct)
+print(TBR_Endotypes_KWT)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hypo, state.pct$endotype, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hypo ~ endotype, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+
+# Residual plot to check homoscedasticity
+plot(TBR_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TBR_Endotypes_ANOVA))
+
+# Check for outliers
+outlierTest(TBR_Endotypes_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TBR_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+
+#Insulin- 24hr TBR KWT
+
+TBR_technologys_KWT <- kruskal.test(hypo ~ technology, data = state.pct)
+print(TBR_technologys_KWT)
+
+TBR_technologys_ANOVA <- aov(hypo ~ technology, data = state.pct)
+summary(TBR_technologys_ANOVA)
+print(TBR_technologys_ANOVA)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hypo, state.pct$technology, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hypo ~ technology, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+# Residual plot to check homoscedasticity
+plot(TBR_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TBR_technologys_ANOVA))
+
+# Check for outliers
+outlierTest(TBR_technologys_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TBR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+
+
+####### 24hr TBR <3.0 ########
+
+Hypo2_AgeDx_correlation <- cor.test(state.pct$AgeDX, state.pct$hypo2, method = "spearman")
+print(Hypo2_AgeDx_correlation)
+
+# Scatter plot to check linearity
+ggplot(state.pct, aes(x = AgeDX, y = hypo2)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Age at Diagnosis (AgeDX)", y = "TBR (<3.0) %",
+       title = "Scatter Plot of AgeDX vs TBR")
+
+# Residual plot to check homoscedasticity
+model <- lm(hypo2 ~ AgeDX, data = state.pct)
+residuals <- resid(model)
+fitted_values <- fitted(model)
+plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residual Plot for Homoscedasticity Check")
+
+# Normality test for residuals
+shapiro.test(residuals)
+
+# Q-Q plot for normality of residuals
+qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+
+# Check for outliers
+outlierTest(model)
+
+# Check for influential points
+influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+
+# 24 TBR (<3.0) by endotype KWT 
+
+TAR_Endotypes_ANOVA <- aov(hypo2 ~ endotype, data = state.pct)
+summary(TAR_Endotypes_ANOVA)
+
+TAR_Endotypes_KWT <- kruskal.test(hypo2 ~ endotype, data = state.pct)
+print(TAR_Endotypes_KWT)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hypo2, state.pct$endotype, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hypo ~ endotype, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+
+# Residual plot to check homoscedasticity
+plot(TAR_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TAR_Endotypes_ANOVA))
+
+# Check for outliers
+outlierTest(TAR_Endotypes_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TAR_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+
+#Insulin- 24hr TBR KWT
+
+TAR_technologys_KWT <- kruskal.test(hypo2 ~ technology, data = state.pct)
+print(TAR_technologys_KWT)
+
+TAR_technologys_ANOVA <- aov(hypo2 ~ technology, data = state.pct)
+summary(TAR_technologys_ANOVA)
+print(TBR_technologys_ANOVA)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hypo2, state.pct$technology, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hypo2 ~ technology, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+# Residual plot to check homoscedasticity
+plot(TAR_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TAR_technologys_ANOVA))
+
+# Check for outliers
+outlierTest(TAR_technologys_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TAR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+
+
+
+####### 24hr TAR >10 ########
+
+hyper_AgeDx_correlation <- cor.test(state.pct$AgeDX, state.pct$hyper, method = "spearman")
+print(hyper_AgeDx_correlation)
+
+# Scatter plot to check linearity
+ggplot(state.pct, aes(x = AgeDX, y = hyper)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Age at Diagnosis (AgeDX)", y = "TBR (<3.0) %",
+       title = "Scatter Plot of AgeDX vs TBR")
+
+# Residual plot to check homoscedasticity
+model <- lm(hyper ~ AgeDX, data = state.pct)
+residuals <- resid(model)
+fitted_values <- fitted(model)
+plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residual Plot for Homoscedasticity Check")
+
+# Normality test for residuals
+shapiro.test(residuals)
+
+# Q-Q plot for normality of residuals
+qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+
+# Check for outliers
+outlierTest(model)
+
+# Check for influential points
+influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+
+# 24 TAR (>10.0) by endotype KWT 
+
+TAR_Endotypes_ANOVA <- aov(hyper ~ endotype, data = state.pct)
+summary(TAR_Endotypes_ANOVA)
+
+TAR_Endotypes_KWT <- kruskal.test(hyper ~ endotype, data = state.pct)
+print(TAR_Endotypes_KWT)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hyper, state.pct$endotype, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hyper ~ endotype, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+
+# Residual plot to check homoscedasticity
+plot(TAR_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TAR_Endotypes_ANOVA))
+
+# Check for outliers
+outlierTest(TAR_Endotypes_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TAR_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+
+#Insulin- 24hr TBR KWT
+
+TAR_technologys_KWT <- kruskal.test(hyper ~ technology, data = state.pct)
+print(TAR_technologys_KWT)
+
+TAR_technologys_ANOVA <- aov(hyper ~ technology, data = state.pct)
+summary(TAR_technologys_ANOVA)
+print(TBR_technologys_ANOVA)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hyper, state.pct$technology, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hyper ~ technology, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+# Residual plot to check homoscedasticity
+plot(TAR_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TAR_technologys_ANOVA))
+
+# Homogeneity of Variance
+leveneTest(TAR_technologys_ANOVA)
+
+# Check for outliers
+outlierTest(TAR_technologys_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TAR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+
+
+####### 24hr TAR2 >13.9.0 ########
+
+hyper2_AgeDx_correlation <- cor.test(state.pct$AgeDX, state.pct$hyper2, method = "spearman")
+print(hyper2_AgeDx_correlation)
+
+# Scatter plot to check linearity
+ggplot(state.pct, aes(x = AgeDX, y = hyper2)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Age at Diagnosis (AgeDX)", y = "TAR (>13.9) %",
+       title = "Scatter Plot of AgeDX vs TBR")
+
+# Residual plot to check homoscedasticity
+model <- lm(hyper2 ~ AgeDX, data = state.pct)
+residuals <- resid(model)
+fitted_values <- fitted(model)
+plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residual Plot for Homoscedasticity Check")
+
+# Normality test for residuals
+shapiro.test(residuals)
+
+# Q-Q plot for normality of residuals
+qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+
+# Check for outliers
+outlierTest(model)
+
+# Check for influential points
+influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+
+# 24 TAR2 (>13.9.0) by endotype KWT 
+
+TAR2_Endotypes_ANOVA <- aov(hyper2 ~ endotype, data = state.pct)
+summary(TAR2_Endotypes_ANOVA)
+
+TAR2_Endotypes_KWT <- kruskal.test(hyper2 ~ endotype, data = state.pct)
+print(TAR2_Endotypes_KWT)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hyper2, state.pct$endotype, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hyper2 ~ endotype, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+
+# Residual plot to check homoscedasticity
+plot(TAR2_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TAR2_Endotypes_ANOVA))
+
+# Check for outliers
+outlierTest(TAR2_Endotypes_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TAR2_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+
+#Insulin- 24hr TBR KWT
+
+TAR2_technologys_KWT <- kruskal.test(hyper2 ~ technology, data = state.pct)
+print(TAR2_technologys_KWT)
+
+TAR2_technologys_ANOVA <- aov(hyper2 ~ technology, data = state.pct)
+summary(TAR2_technologys_ANOVA)
+print(TBR_technologys_ANOVA)
+
+# Perform post-hoc pairwise comparisons using Dunn's test
+dunn_test <- dunn.test(state.pct$hyper2, state.pct$technology, method = "bonferroni")
+
+# Print post-hoc test results
+print(dunn_test)
+
+means_sd <- aggregate(hyper2 ~ technology, data = state.pct, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+print(means_sd)
+
+# Check ANOVA assumptions
+# Residual plot to check homoscedasticity
+plot(TAR2_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+
+# Normality test for residuals
+shapiro.test(resid(TAR2_technologys_ANOVA))
+
+# Homogeneity of Variance
+leveneTest(TAR2_technologys_ANOVA)
+
+# Check for outliers
+outlierTest(TAR2_technologys_ANOVA)
+
+# Check for influential points
+influenceIndexPlot(TAR2_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+
+
+#######################################
+###########    exercise     ###########
+
+exercise <- fread("PR.txt")
+exercise
+
+exTimes <-
+  exercise[order(PRSTDTC)][
+    , .(starttime = PRSTDTC,
+        endtime = PRSTDTC + as.difftime(PLNEXDUR, units="mins")),
+    by=.(USUBJID, PRSEQ,
+         intensity = EXCINTSY, rescueCarb = RESQCARB)]
+exTimes
+## set key of data.table, which also orders data by that column
+setkey(exTimes, starttime)
+## make new columns, containing start and end times of next and
+## previous bouts, plus a boolean indicating whether the current bout
+## overlaps with the previous bout and one for the next bout
+exTimes[
+  , `:=`(overlapsnext = as.logical(endtime > shift(starttime, -1)),
+         nextstart = shift(starttime, -1),
+         nextend = shift(endtime, -1),
+         overlapsprev = as.logical(starttime < shift(endtime, 1)),
+         prevstart = shift(starttime, 1),
+         prevend = shift(endtime, 1)),
+  by = "USUBJID"]
+## Make a new column, indicating whether either next or previous bout
+## overlaps with current bout
+exTimes[, overlaps := (!is.na(overlapsnext) & overlapsnext) |
+          (!is.na(overlapsprev) & overlapsprev)]
+sum(exTimes$overlaps, na.rm=TRUE) ## 76 overlapping bouts (152 rows)
+
+
+exTimes[overlapsnext & overlapsprev, .N]
+## Take the minimum start time, and maximum end time for overlapping
+## bouts
+exTimes[overlapsnext == TRUE,
+        `:=`(starttime = min(starttime, nextstart),
+             endtime = max(endtime, nextend)), by=.(USUBJID, PRSEQ)]
+exTimes[overlapsprev == TRUE,
+        `:=`(starttime = min(starttime, prevstart),
+             endtime = max(endtime, prevend)), by=.(USUBJID, PRSEQ)]
+
+## The intensity of the new, extended, bout is the maximum of the
+## intensities, and if rescue carbs were taking during either of the
+## overlapping bouts
+exTimes[overlaps == TRUE,
+        `:=`(intensity = max(intensity),
+             rescueCarb = max(rescueCarb)),
+        by=.(USUBJID, starttime, endtime)]
+## Remove now duplicated bouts (keeping only one) and extra columns
+exTimes <- exTimes[!duplicated(exTimes[
+  , .(USUBJID, starttime, endtime)])][
+    , .(USUBJID, PRSEQ, intensity, rescueCarb, starttime, endtime)]
+exTimes[, duration := difftime(endtime, starttime, units="mins")]
+exTimes
+
+  exerciseCGM <-
+      rbindlist(lapply(unique(gd$USUBJID), function (subject) {
+          if (!subject %in% unique(exTimes$USUBJID)) {
+              next
+          }
+          rbindlist(lapply(exTimes[USUBJID == subject, PRSEQ], function (bout) {
+              thisbout <- exTimes[USUBJID == subject & PRSEQ == bout]
+              gd[USUBJID == subject &
+                 LBDTC >= thisbout$starttime &
+                 LBDTC <= thisbout$endtime,
+                 .(USUBJID, mmolL, LBDTC,
+                   state, threestate, day, SEX, AGE,
+                   endotype, ysincediag, technology, index,
+                   intensity = thisbout$intensity,
+                   rescueCarb = thisbout$rescueCarb,
+                   bout = thisbout$PRSEQ)]
+          }))
+      }))
+  exerciseCGM[, stime := difftime(LBDTC, min(LBDTC), units="mins"),
+              by=.(USUBJID, bout)]
+  
+  saveRDS(exerciseCGM, "exerciseCGM.Rds")
+  
+  exerciseCGM <- readRDS("exerciseCGM.Rds")
+  exerciseCGM # 101512 measurements
+  
+  
+  
+  exerciseCGM[, .(measurements = .N, duration = max(stime)),
+              by=.(USUBJID, bout)][measurements < 3][order(duration)]
+  
+  exerciseCGM <-
+    merge(exerciseCGM[, .(measurements = .N), by=.(USUBJID, bout)][
+      measurements >= 3, .(USUBJID, bout)],
+      exerciseCGM)
+  exerciseCGM
+  
+  exerciseCGM[, .(nbout = length(unique(bout))), by=.(USUBJID)][nbout < 5]
+  
+  exerciseCGM <-
+    exerciseCGM[USUBJID %in%
+                  exerciseCGM[, .(nbout = length(unique(bout))),
+                              by=.(USUBJID)][
+                                nbout >= 5, USUBJID]]
+  exerciseCGM
+  
+  cgmReportDiff <-
+    merge(exerciseCGM[, .(cgmStart=min(LBDTC),
+                          cgmDuration=round(max(stime)),
+                          measurements=.N),
+                      by=.(USUBJID, bout)],
+          exTimes[, .(starttime, duration), by=.(USUBJID, PRSEQ)][
+            , .(starttime, duration, USUBJID, bout = PRSEQ)])
+  
+  barplot(table(cgmReportDiff[measurements >= 3,
+                              round(duration - cgmDuration)]), las=2,
+          ylab="Nr of bouts", xlab="Time difference (minutes) between reported excercise times and first and last CGM measurement within that time period")
+  
+  cgmReportDiff <- 
+    merge(unique(exerciseCGM[, .(USUBJID, bout)]),
+                         cgmReportDiff)
+  
+  
+  barplot(table(cgmReportDiff[measurements >= 3,
+                              .(measurements / (as.numeric(duration)))]))
+  
+  merge(exerciseCGM[, .(start = min(LBDTC), end = max(LBDTC)),
+                    by=.(USUBJID, bout)],
+        exTimes[, .(USUBJID, bout = PRSEQ, starttime, endtime)])[
+          , .(startdiff = difftime(start, starttime),
+              enddiff = difftime(endtime, end)), by=.(USUBJID, bout)][
+                startdiff > as.difftime(10, units="mins") |
+                  enddiff > as.difftime(10, units="mins")]
+  
+  incl.bout.subj <- 
+    merge(exerciseCGM[, .(start = min(LBDTC), end = max(LBDTC)),
+                      by=.(USUBJID, bout)],
+          exTimes[, .(USUBJID, bout = PRSEQ, starttime, endtime)])[
+            , .(startdiff = difftime(start, starttime),
+                enddiff = difftime(endtime, end)), by=.(USUBJID, bout)][
+                  startdiff <= as.difftime(10, units="mins") &
+                    enddiff <= as.difftime(10, units="mins")][, .(USUBJID, bout)]
+  
+ 
+  
+  barplot(table(round(exTimes$duration)),
+          xlab="Length of exercise bouts (min)",
+          ylab="Number of bouts", las=2)
+  
+  meanlength.subject <-
+    unique(merge(exTimes[, .(USUBJID, bout = PRSEQ, duration)],
+                 exerciseCGM[, .(USUBJID, bout, endotype, technology)]))[
+                   , .(exLength = mean(as.numeric(duration))),
+                   by=.(USUBJID, endotype, technology)]
+  meanlength.subject
+  
+  meanlength <- 
+    rbind(meanlength.subject[, .(mean = mean(as.numeric(exLength)),
+                                 sd = sd(as.numeric(exLength)),
+                                 cv = var(as.numeric(exLength)) /
+                                   mean(as.numeric(exLength)),
+                                 N = .N),
+                             by=.(endotype, technology)],
+          meanlength.subject[, .(mean = mean(as.numeric(exLength)),
+                                 sd = sd(as.numeric(exLength)),
+                                 cv = var(as.numeric(exLength)) /
+                                   mean(as.numeric(exLength)),
+                                 endotype="Total",
+                                 N = .N),
+                             by=.(technology)],
+          meanlength.subject[, .(mean = mean(as.numeric(exLength)),
+                                 sd = sd(as.numeric(exLength)),
+                                 cv = var(as.numeric(exLength)) /
+                                   mean(as.numeric(exLength)),
+                                 technology="Total",
+                                 N = .N),
+                             by=.(endotype)],
+          meanlength.subject[, .(mean = mean(as.numeric(exLength)),
+                                 sd = sd(as.numeric(exLength)),
+                                 cv = var(as.numeric(exLength)) /
+                                   mean(as.numeric(exLength)),
+                                 technology="Total", endotype="Total",
+                                 N = .N)])
+  
+  meanlength[, .(technology, endotype, mean, sd, cv, N)][order(cv)]
+  
+  dcast(meanlength[, .(meansd = paste0(signif(mean, 3), " (",
+                                       signif(sd, 3), ")")),
+                   by=.(technology, endotype)],
+        endotype ~ technology, value.var="meansd")
+  
+  barplot(table(exTimes[, .N, by=USUBJID]$N),
+          xlab="Number of exercise bouts", ylab="Number of subjects", las=2)
+  table(cgmReportDiff[, .N, by=USUBJID]$N)
+  
+  exerciseStateBout <- 
+    exerciseCGM[, .(hypo2 = sum(state == "hypo2") / .N,
+                    hypo1 = sum(state == "hypo1") / .N,
+                    normal = sum(state == "normal") / .N,
+                    hyper1 = sum(state == "hyper1") / .N,
+                    hyper2 = sum(state == "hyper2") / .N),
+                by=.(USUBJID, bout, endotype, technology, AGE, ysincediag)]
+  exerciseStateBout <- 
+    merge(exerciseStateBout,
+          exTimes[, .(USUBJID, bout = PRSEQ, duration)])
+  
+  
+  exerciseStateBout
+  
+  exerciseState <- 
+    exerciseStateBout[, lapply(.SD, mean),
+                      by=.(USUBJID, endotype, technology, AgeDX),
+                      .SDcols=c("hypo2", "hypo1", "normal",
+                                "hyper1", "hyper2")][
+                                  , .(rowsum=sum(.SD)),
+                                  by=.(USUBJID, endotype, technology, AgeDX,
+                                       hypo2, hypo1, normal, hyper1, hyper2),
+                                  .SDcols=c("hypo2", "hypo1", "normal",
+                                            "hyper1", "hyper2")][
+                                              , lapply(.SD, function (x) x/rowsum),
+                                              by=.(USUBJID, endotype, technology, AgeDX),
+                                              .SDcols=c("hypo2", "hypo1", "normal",
+                                                        "hyper1", "hyper2")]
+  exerciseState
+  
+  
+  exerciseState <- 
+    exerciseState[,.(hypo = hypo2 + hypo1,
+                       hyper = hyper1 + hyper2),
+                      by=.(USUBJID, endotype, technology, AgeDX, hypo2, hypo1, normal, hyper1, hyper2)]
+  
+  ########### correlation ### exercise - TIR vs AgeDx ############
+  
+  Eug_AgeDX_ex_correlation <- cor.test(exerciseState$AgeDX, exerciseState$normal, method = "pearson")
+  print(Eug_AgeDX_ex_correlation)
+  
+  Eug_AgeDX_ex_correlation <- cor.test(exerciseState$AgeDX, exerciseState$normal, method = "spearman")
+  print(Eug_AgeDX_ex_correlation)
+  
+  
+  
+  # Scatter plot to check linearity
+  ggplot(exerciseState, aes(x = AgeDX, y = normal)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(x = "Age at Diagnosis (AgeDX)", y = "TIR %",
+         title = "Scatter Plot of AgeDX vs TIR")
+  
+  # Residual plot to check homoscedasticity
+  model <- lm(normal ~ AgeDX, data = exerciseState)
+  residuals <- resid(model)
+  fitted_values <- fitted(model)
+  plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+       main = "Residual Plot for Homoscedasticity Check")
+  
+  # Normality test for residuals
+  shapiro.test(residuals)
+  
+  # Q-Q plot for normality of residuals
+  qqnorm(residuals)
+  qqline(residuals, col = "red")  # Add a reference line
+  title("Q-Q Plot for Normality of Residuals")
+  
+  # Check for outliers
+  outlierTest(model)
+  
+  # Check for influential points
+  influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+  
+  
+  ##### exercise TIR by endotype KWT
+  
+  TIRexercise_Endotypes_KWT <- kruskal.test(normal ~ endotype, data = exerciseState)
+  print(TIRexercise_Endotypes_KWT)
+  
+  TIRexercise_Endotypes_ANOVA <- aov(normal ~ endotype, data = exerciseState)
+  summary.aov(TIRexercise_Endotypes_ANOVA)
+  
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$normal, exerciseState$endotype, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(normal ~ endotype, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  # Residual plot to check homoscedasticity
+  plot(TIRexercise_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TIRexercise_Endotypes_ANOVA))
+  
+  # Check for outliers
+  outlierTest(TIRexercise_Endotypes_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TIRexercise_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+  
+  #Insulin-exercise KWT
+  
+  TIRexercise_technologys_KWT <- kruskal.test(normal ~ technology, data = exerciseState)
+  print(TIRexercise_technologys_KWT)
+  
+  TIRexercise_technologys_ANOVA <- aov(normal ~ technology, data = exerciseState)
+  summary(TIRexercise_technologys_ANOVA)
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$normal, exerciseState$technology, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(normal ~ technology, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  # Residual plot to check homoscedasticity
+  plot(TIRexercise_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TIRexercise_technologys_ANOVA))
+  
+  # Check for outliers
+  outlierTest(TIRexercise_technologys_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TIRexercise_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+
+  
+  ####### exercise TBR <3.9 ########
+  
+  Hypoexercise_AgeDx_correlation <- cor.test(exerciseState$AgeDX, exerciseState$hypo, method = "spearman")
+  print(Hypoexercise_AgeDx_correlation)
+  
+  # Scatter plot to check linearity
+  ggplot(exerciseState, aes(x = AgeDX, y = hypo)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(x = "Age at Diagnosis (AgeDX)", y = "TBR (<3.9) %",
+         title = "Scatter Plot of AgeDX vs TBR")
+  
+  # Residual plot to check homoscedasticity
+  model <- lm(hypo ~ AgeDX, data = exerciseState)
+  residuals <- resid(model)
+  fitted_values <- fitted(model)
+  plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+       main = "Residual Plot for Homoscedasticity Check")
+  
+  # Normality test for residuals
+  shapiro.test(residuals)
+  
+  # Q-Q plot for normality of residuals
+  qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+  
+  # Check for outliers
+  outlierTest(model)
+  
+  # Check for influential points
+  influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+  
+  # exercise TBR (<3.9) by endotype KWT 
+  
+  TBRexercise_Endotypes_ANOVA <- aov(hypo ~ endotype, data = exerciseState)
+  summary(TBRexercise_Endotypes_ANOVA)
+  
+  TBRexercise_Endotypes_KWT <- kruskal.test(hypo ~ endotype, data = exerciseState)
+  print(TBRexercise_Endotypes_KWT)
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$hypo, exerciseState$endotype, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(hypo ~ endotype, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  
+  # Residual plot to check homoscedasticity
+  plot(TBRexercise_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TBRexercise_Endotypes_ANOVA))
+  
+  # Check for outliers
+  outlierTest(TBRexercise_Endotypes_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TBRexercise_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+  
+  #Insulin- exercise TBR KWT
+  
+  TBRexercise_technologys_KWT <- kruskal.test(hypo ~ technology, data = exerciseState)
+  print(TBRexercise_technologys_KWT)
+  
+  TBRexercise_technologys_ANOVA <- aov(hypo ~ technology, data = exerciseState)
+  summary(TBRexercise_technologys_ANOVA)
+  print(TBR_technologys_ANOVA)
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$hypo, exerciseState$technology, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(hypo ~ technology, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  # Residual plot to check homoscedasticity
+  plot(TBRexercise_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TBRexercise_technologys_ANOVA))
+  
+  # Check for outliers
+  outlierTest(TBRexercise_technologys_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TBRexercise_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+  
+  
+  
+  ####### exercise TBR <3.0 ########
+  
+  Hypo2exercise_AgeDx_correlation <- cor.test(exerciseState$AgeDX, exerciseState$hypo2, method = "spearman")
+  print(Hypo2exercise_AgeDx_correlation)
+  
+  # Scatter plot to check linearity
+  ggplot(exerciseState, aes(x = AgeDX, y = hypo2)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(x = "Age at Diagnosis (AgeDX)", y = "TBR (<3.0) %",
+         title = "Scatter Plot of AgeDX vs TBR")
+  
+  # Residual plot to check homoscedasticity
+  model <- lm(hypo2 ~ AgeDX, data = exerciseState)
+  residuals <- resid(model)
+  fitted_values <- fitted(model)
+  plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+       main = "Residual Plot for Homoscedasticity Check")
+  
+  # Normality test for residuals
+  shapiro.test(residuals)
+  
+  # Q-Q plot for normality of residuals
+  qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+  
+  # Check for outliers
+  outlierTest(model)
+  
+  # Check for influential points
+  influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+  
+  # exercise TBR (<3.0) by endotype KWT 
+  
+  TBRexercise_Endotypes_ANOVA <- aov(hypo2 ~ endotype, data = exerciseState)
+  summary(TBRexercise_Endotypes_ANOVA)
+  
+  TBRexercise_Endotypes_KWT <- kruskal.test(hypo2 ~ endotype, data = exerciseState)
+  print(TBRexercise_Endotypes_KWT)
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$hypo2, exerciseState$endotype, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(hypo ~ endotype, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  
+  # Residual plot to check homoscedasticity
+  plot(TBRexercise_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TBRexercise_Endotypes_ANOVA))
+  
+  # Check for outliers
+  outlierTest(TBRexercise_Endotypes_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TBRexercise_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+  
+  #Insulin- exercise TBR KWT
+  
+  TBRexercise_technologys_KWT <- kruskal.test(hypo2 ~ technology, data = exerciseState)
+  print(TBRexercise_technologys_KWT)
+  
+  TBRexercise_technologys_ANOVA <- aov(hypo2 ~ technology, data = exerciseState)
+  summary(TBRexercise_technologys_ANOVA)
+  print(TBR_technologys_ANOVA)
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$hypo2, exerciseState$technology, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(hypo2 ~ technology, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  # Residual plot to check homoscedasticity
+  plot(TBRexercise_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TBRexercise_technologys_ANOVA))
+  
+  # Check for outliers
+  outlierTest(TBRexercise_technologys_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TBRexercise_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+  
+  
+  
+  
+  ####### exercise TAR >10 ########
+  
+  hyperexercise_AgeDx_correlation <- cor.test(exerciseState$AgeDX, exerciseState$hyper, method = "spearman")
+  print(hyperexercise_AgeDx_correlation)
+  
+  # Scatter plot to check linearity
+  ggplot(exerciseState, aes(x = AgeDX, y = hyper)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(x = "Age at Diagnosis (AgeDX)", y = "TAR (>13.9) %",
+         title = "Scatter Plot of AgeDX vs TAR")
+  
+  # Residual plot to check homoscedasticity
+  model <- lm(hyper ~ AgeDX, data = exerciseState)
+  residuals <- resid(model)
+  fitted_values <- fitted(model)
+  plot(fitted_values, residuals, xlab = "Fitted Values", ylab = "Residuals",
+       main = "Residual Plot for Homoscedasticity Check")
+  
+  # Normality test for residuals
+  shapiro.test(residuals)
+  
+  # Q-Q plot for normality of residuals
+  qqPlot(residuals, main = "Q-Q Plot for Normality of Residuals")
+  
+  # Check for outliers
+  outlierTest(model)
+  
+  # Check for influential points
+  influenceIndexPlot(model, id.n = 5)  # Display top 5 influential points
+  
+  # exercise TAR (>10.0) by endotype KWT 
+  
+  TARexercise_Endotypes_ANOVA <- aov(hyper ~ endotype, data = exerciseState)
+  summary(TARexercise_Endotypes_ANOVA)
+  
+  TARexercise_Endotypes_KWT <- kruskal.test(hyper ~ endotype, data = exerciseState)
+  print(TARexercise_Endotypes_KWT)
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$hyper, exerciseState$endotype, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(hyper ~ endotype, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  
+  # Residual plot to check homoscedasticity
+  plot(TARexercise_Endotypes_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TARexercise_Endotypes_ANOVA))
+  
+  # Check for outliers
+  outlierTest(TARexercise_Endotypes_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TARexercise_Endotypes_ANOVA, id.n = 5)  # Display top 5 influential points
+  
+  #Insulin- exercise TAR KWT
+  
+  TARexercise_technologys_KWT <- kruskal.test(hyper ~ technology, data = exerciseState)
+  print(TARexercise_technologys_KWT)
+  
+  TARexercise_technologys_ANOVA <- aov(hyper ~ technology, data = exerciseState)
+  summary(TARexercise_technologys_ANOVA)
+  
+  
+  # Perform post-hoc pairwise comparisons using Dunn's test
+  dunn_test <- dunn.test(exerciseState$hyper, exerciseState$technology, method = "bonferroni")
+  
+  # Print post-hoc test results
+  print(dunn_test)
+  
+  means_sd <- aggregate(hyper ~ technology, data = exerciseState, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  print(means_sd)
+  
+  # Check ANOVA assumptions
+  # Residual plot to check homoscedasticity
+  plot(TAR_technologys_ANOVA, 1)  # Plot 1: Residuals vs Fitted
+  
+  # Normality test for residuals
+  shapiro.test(resid(TAR_technologys_ANOVA))
+  
+  # Homogeneity of Variance
+  leveneTest(TAR_technologys_ANOVA)
+  
+  # Check for outliers
+  outlierTest(TAR_technologys_ANOVA)
+  
+  # Check for influential points
+  influenceIndexPlot(TAR_technologys_ANOVA, id.n = 5)  # Display top 5 influential points
+  
+  
